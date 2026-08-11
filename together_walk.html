@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>함께 걸어요 · 쏠링크 프로토타입</title>
+<style>
+  :root{
+    --bg-0:#07070c;
+    --bg-1:#0d0e15;
+    --surface:#15161f;
+    --surface-2:#1c1d29;
+    --stroke:rgba(255,255,255,0.09);
+    --text-0:#f5f6fa;
+    --text-1:#9a9db0;
+    --text-2:#5c5f70;
+    --brand:#3f5fff;
+    --brand-light:#7c9bff;
+    --brand-dark:#182566;
+    --gold:#ffcf5c;
+    --mint:#46e0b0;
+    --coral:#ff9d80;
+    --lavender:#c9b8ff;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; }
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 50% -10%, #14151f 0%, transparent 55%),
+      radial-gradient(circle at 85% 90%, #0e1730 0%, transparent 45%),
+      var(--bg-0);
+    font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','Apple SD Gothic Neo','Pretendard',sans-serif;
+    color:var(--text-0);
+    padding:18px 16px 24px;
+    display:flex;
+    justify-content:center;
+  }
+  @media (prefers-reduced-motion: reduce){ *{ animation:none !important; transition:none !important; } }
+
+  .stage{ display:flex; flex-wrap:wrap-reverse; gap:30px; align-items:flex-start; justify-content:center; max-width:900px; width:100%; }
+
+  /* ---------- control panel (side, off the device) ---------- */
+  .control-panel{ width:224px; flex-shrink:0; display:flex; flex-direction:column; gap:16px; padding-top:10px; }
+  .control-panel .eyebrow{ font-size:11.5px; font-weight:700; letter-spacing:.14em; color:var(--brand-light); text-transform:uppercase; }
+  .control-panel h1{ font-size:20px; font-weight:800; }
+  .control-panel p{ font-size:12.5px; color:var(--text-1); line-height:1.7; }
+  .panel-divider{ height:1px; background:var(--stroke); margin:2px 0; }
+  .panel-label{ font-size:11px; font-weight:700; color:var(--text-2); letter-spacing:.06em; }
+  .jump-row{ display:flex; flex-direction:column; gap:8px; }
+  .jump-btn{ text-align:left; font-size:12.5px; font-weight:700; color:var(--text-1); background:var(--surface); border:1px solid var(--stroke); padding:10px 12px; border-radius:12px; cursor:pointer; }
+  .jump-btn.on{ background:var(--brand); color:#fff; border-color:var(--brand); }
+  .panel-hint{ font-size:11.5px; color:var(--text-2); line-height:1.7; }
+
+  /* ---------- device column ---------- */
+  .device-col{ order:1; display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .control-panel{ order:2; }
+
+  .iphone-shell{
+    position:relative;
+    width:300px;
+    max-width:82vw;
+    height:620px;
+    max-height:80vh;
+    border-radius:46px;
+    background:linear-gradient(150deg,#55575e 0%,#26272c 38%,#0b0b0d 100%);
+    padding:12px;
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,.08),
+      0 0 0 2px rgba(0,0,0,.5),
+      0 44px 90px -30px rgba(0,0,0,.9);
+  }
+  .side-btn{ position:absolute; background:#0b0b0d; box-shadow:inset 0 0 0 1px rgba(255,255,255,.05); }
+  .btn-mute{ left:-2px; top:86px; width:3px; height:19px; border-radius:2px 0 0 2px; }
+  .btn-vol-up{ left:-2px; top:114px; width:3px; height:33px; border-radius:2px 0 0 2px; }
+  .btn-vol-down{ left:-2px; top:154px; width:3px; height:33px; border-radius:2px 0 0 2px; }
+  .btn-power{ right:-2px; top:132px; width:3px; height:54px; border-radius:0 2px 2px 0; }
+
+  .iphone-screen{ width:100%; height:100%; border-radius:34px; overflow:hidden; position:relative; background:var(--bg-1); }
+  .dynamic-island{ position:absolute; top:9px; left:50%; transform:translateX(-50%); width:70px; height:19px; background:#000; border-radius:12px; z-index:70; }
+
+  .statusbar{ position:absolute; top:0; left:0; right:0; display:flex; align-items:center; justify-content:space-between; padding:14px 22px 2px; font-size:11px; color:var(--text-0); z-index:80; background:transparent; pointer-events:none; }
+  .statusbar .right{ display:flex; align-items:center; gap:5px; opacity:.85; }
+  .sig-bars{ display:flex; align-items:flex-end; gap:2px; height:9px; }
+  .sig-bars span{ width:3px; background:var(--text-0); border-radius:1px; }
+  .sig-bars span:nth-child(1){height:40%;} .sig-bars span:nth-child(2){height:60%;}
+  .sig-bars span:nth-child(3){height:80%;} .sig-bars span:nth-child(4){height:100%;}
+  .battery{ width:20px; height:10px; border:1px solid var(--text-0); border-radius:2px; position:relative; }
+  .battery::after{ content:''; position:absolute; right:-3px; top:3px; width:2px; height:4px; background:var(--text-0); border-radius:0 1px 1px 0; }
+  .battery i{ display:block; height:100%; width:78%; background:var(--text-0); border-radius:1px; }
+
+  .app{ position:absolute; top:0; left:0; right:0; bottom:0; overflow:hidden; }
+  .screen{ position:absolute; inset:0; display:none; flex-direction:column; background:var(--bg-1); }
+  .screen.active{ display:flex; }
+
+  .screen-header{ display:flex; align-items:center; justify-content:space-between; padding:32px 18px 6px; flex-shrink:0; }
+  .header-left{ display:flex; align-items:center; gap:10px; }
+  .back-btn{ width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.14); color:var(--text-0); cursor:pointer; border:none; font-size:16px; flex-shrink:0; }
+  .back-btn.hidden{ visibility:hidden; }
+  .header-title{ font-size:15.5px; font-weight:700; color:var(--text-0); }
+  .header-icons{ display:flex; gap:14px; color:var(--text-0); opacity:.9; }
+
+  .step-dots{ display:flex; gap:6px; padding:2px 18px 10px; flex-shrink:0; }
+  .step-dots span{ height:4px; flex:1; border-radius:2px; background:rgba(255,255,255,.18); transition:background .3s; }
+  .step-dots span.done{ background:var(--brand-light); }
+  .done-badge{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:var(--mint); background:rgba(70,224,176,.12); border:1px solid rgba(70,224,176,.3); padding:6px 12px; border-radius:20px; margin:2px 18px 10px; width:fit-content; }
+
+  .screen-body{ flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:2px 22px 30px; }
+  .screen-body::-webkit-scrollbar{ width:0; }
+  .screen-footer{ flex-shrink:0; padding:12px 22px 24px; background:linear-gradient(180deg, transparent, var(--bg-1) 35%); }
+  .screen-footer.light{ background:#fff; }
+
+  button.primary-btn{ width:100%; padding:16px; border-radius:18px; border:none; background:linear-gradient(135deg, var(--brand), var(--brand-light)); color:#fff; font-size:15.5px; font-weight:700; cursor:pointer; }
+  button.primary-btn:active{ transform:scale(.98); }
+  button.ghost-btn{ width:100%; padding:14px; border-radius:16px; border:1px solid var(--stroke); background:var(--surface); color:var(--text-0); font-size:14.5px; font-weight:700; cursor:pointer; }
+  button:focus-visible, input:focus-visible, .chip:focus-visible{ outline:2px solid var(--brand-light); outline-offset:2px; }
+
+  /* ---------- screen1 hero (light gradient, matches original reference) ---------- */
+  .hero-scene{ flex-shrink:0; position:relative; overflow:hidden; padding-bottom:14px;
+    background:linear-gradient(180deg,#0b1638 0%, #1c50f5 40%, #3f7dff 70%, #74a4ff 100%); }
+  .hero-content{ padding:0 22px; position:relative; z-index:3; }
+  .hero-main-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .hero-tags{ display:flex; gap:7px; margin:8px 0 10px; flex-wrap:wrap; }
+  .hero-heading{ flex:1; font-size:16px; font-weight:800; line-height:1.4; color:#fff; margin:0; }
+  .mascot-row{ flex-shrink:0; display:flex; align-items:flex-end; justify-content:flex-end; margin-top:0; }
+  .mascot-row .mascot-a{ width:38px; animation:bob 2.3s ease-in-out infinite; }
+  .mascot-row .mascot-b{ width:25px; margin-left:-6px; animation:bob 2.3s ease-in-out infinite .3s; }
+  .tag-pill{ font-size:12px; font-weight:700; padding:6px 11px; border-radius:20px; border:1px solid transparent; color:#fff; }
+  .tag-pill.mint{ background:rgba(70,224,176,.28); border-color:rgba(70,224,176,.55); }
+  .tag-pill.coral{ background:rgba(255,157,128,.28); border-color:rgba(255,157,128,.55); }
+  .tag-pill.gold{ background:rgba(255,207,92,.28); border-color:rgba(255,207,92,.55); }
+  .cloud{ position:absolute; background:rgba(255,255,255,.5); border-radius:40px; filter:blur(1px); }
+  .confetti-dot{ position:absolute; width:7px; height:7px; border-radius:2px; opacity:.85; }
+
+  .mascot-row.mini .mascot-a{ width:46px; }
+  .mascot-row.mini .mascot-b{ width:32px; margin-left:-8px; }
+  @keyframes bob{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-6px); } }
+
+  .sheet-white{ background:#fff; border-radius:28px 28px 0 0; margin-top:-16px; position:relative; z-index:4;
+    flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:20px 22px 40px; box-shadow:0 -10px 16px rgba(0,0,0,.18); }
+  .hero-sub-dark{ font-size:13.5px; color:#5b6472; line-height:1.65; margin:2px 0 20px; }
+  .card-light{ background:#f4f6fb; border:1px solid #e8ebf3; border-radius:22px; padding:19px; }
+  .card-title-dark{ font-size:15px; font-weight:800; color:#161821; margin-bottom:6px; }
+  .card-desc-dark{ font-size:13.5px; color:#5b6472; line-height:1.65; }
+  .bullet-list{ margin-top:14px; display:flex; flex-direction:column; gap:9px; }
+  .bullet-item-dark{ display:flex; align-items:flex-start; gap:8px; font-size:13.5px; color:#232733; line-height:1.5; font-weight:600; }
+  .bullet-dot{ width:6px; height:6px; border-radius:50%; background:var(--brand); flex-shrink:0; margin-top:6px; }
+
+  /* ---------- shared dark-theme content ---------- */
+  .card{ background:var(--surface); border:1px solid var(--stroke); border-radius:22px; padding:19px; margin-bottom:14px; }
+  .card-title{ font-size:15px; font-weight:700; color:var(--text-0); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+  .card-desc{ font-size:13.5px; color:var(--text-1); line-height:1.65; }
+
+  .hero-title{ font-size:23px; font-weight:800; line-height:1.42; color:var(--text-0); margin-bottom:10px; }
+  .hero-title b{ color:var(--brand-light); }
+  .hero-sub{ font-size:14px; color:var(--text-1); line-height:1.65; margin-bottom:22px; }
+
+  .section-label{ font-size:12.5px; font-weight:700; color:var(--text-1); margin:18px 0 10px; }
+  .section-label:first-child{ margin-top:2px; }
+  .chip-row{ display:flex; gap:8px; margin-bottom:6px; flex-wrap:wrap; }
+  .chip{ padding:10px 16px; border-radius:16px; background:var(--surface); border:1px solid var(--stroke); color:var(--text-1); font-size:13.5px; font-weight:700; cursor:pointer; }
+  .chip.active{ background:var(--brand); color:#fff; border-color:var(--brand); }
+
+  .field{ margin-bottom:16px; }
+  .field label{ display:block; font-size:12.5px; color:var(--text-1); margin-bottom:8px; font-weight:700; }
+  .field input{ width:100%; padding:14px 16px; border-radius:16px; background:var(--surface); border:1px solid var(--stroke); color:var(--text-0); font-size:14.5px; }
+  .field input::placeholder{ color:var(--text-2); }
+
+  .stepper{ display:flex; align-items:center; justify-content:space-between; background:var(--surface); border:1px solid var(--stroke); border-radius:18px; padding:12px 16px; }
+  .stepper-btn{ width:36px; height:36px; border-radius:50%; background:var(--surface-2); border:none; color:var(--text-0); font-size:19px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .stepper-mid{ text-align:center; }
+  .stepper-value{ font-size:17px; font-weight:800; color:var(--text-0); }
+  .stepper-caption{ font-size:11px; color:var(--text-2); margin-top:2px; }
+
+  .kakao-btn{ width:100%; padding:15px; border-radius:18px; background:#FEE500; color:#391B1B; font-weight:700; font-size:14.5px; border:none; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; margin:4px 0 18px; }
+  .divider-text{ text-align:center; font-size:12px; color:var(--text-2); margin:2px 0 16px; }
+  .field-row{ display:flex; gap:8px; }
+  .field-row .field{ flex:1; }
+  .add-btn{ width:100%; padding:12px; border-radius:14px; border:1px dashed var(--stroke); background:transparent; color:var(--brand-light); font-size:13.5px; font-weight:700; cursor:pointer; margin-bottom:18px; }
+
+  .invite-list{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px; }
+  .invite-chip{ display:flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--stroke); padding:7px 12px; border-radius:16px; font-size:12.5px; color:var(--text-0); font-weight:600; }
+  .invite-chip .ok{ color:var(--mint); font-weight:800; }
+
+  .reward-row{ display:flex; justify-content:space-between; align-items:center; padding:9px 0; font-size:13.5px; }
+  .reward-row:not(:last-child){ border-bottom:1px solid var(--stroke); }
+  .reward-row b{ color:var(--gold); }
+
+  .stock-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; min-width:0; }
+  .stock-tile{ display:flex; align-items:center; gap:8px; padding:9px 8px; border-radius:15px; background:var(--surface); border:1px solid var(--stroke); cursor:pointer; text-align:left; min-width:0; overflow:hidden; }
+  .stock-tile.active{ background:rgba(63,95,255,.16); border-color:var(--brand); }
+  .stock-badge{ width:28px; height:28px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; flex-shrink:0; letter-spacing:-.03em; line-height:1; }
+  .stock-info{ min-width:0; flex:1; overflow:hidden; }
+  .stock-name{ display:block; font-size:11px; font-weight:700; color:var(--text-0); line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .stock-ticker{ display:block; font-size:9.5px; color:var(--text-1); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  .demo-note{ font-size:11px; color:var(--text-2); font-weight:700; letter-spacing:.02em; margin-bottom:8px; }
+  .demo-toggle{ display:flex; gap:6px; background:var(--surface-2); padding:4px; border-radius:14px; margin-bottom:16px; }
+  .demo-toggle button{ flex:1; padding:9px; border:none; border-radius:11px; background:transparent; color:var(--text-1); font-size:12.5px; font-weight:700; cursor:pointer; }
+  .demo-toggle button.active{ background:var(--brand); color:#fff; }
+
+  .loading-row{ display:none; align-items:center; gap:10px; color:var(--text-1); font-size:13.5px; padding:16px 0; }
+  .dot-flash{ display:flex; gap:4px; }
+  .dot-flash span{ width:6px; height:6px; border-radius:50%; background:var(--brand-light); animation:flash 1s infinite ease-in-out; }
+  .dot-flash span:nth-child(2){ animation-delay:.15s; } .dot-flash span:nth-child(3){ animation-delay:.3s; }
+  @keyframes flash{ 0%,80%,100%{ opacity:.25; } 40%{ opacity:1; } }
+
+  .result-card{ display:none; }
+
+  .mini-hero{ background:linear-gradient(135deg,#132057,#1c50f5); border-radius:24px; padding:14px 10px 4px; display:flex; justify-content:center; margin:4px 0 16px; }
+
+  .progress-wrap{ margin:20px 0 6px; }
+  .progress-track{ height:10px; border-radius:6px; background:var(--surface-2); position:relative; overflow:hidden; }
+  .progress-fill{ height:100%; border-radius:6px; background:linear-gradient(90deg,var(--brand),var(--brand-light)); transition:width .6s ease; }
+  .progress-labels{ display:flex; justify-content:space-between; margin-top:12px; }
+  .milestone-pill{ background:var(--surface-2); border-radius:20px; padding:5px 11px; display:flex; align-items:center; gap:5px; font-weight:700; color:var(--text-0); font-size:12.5px; }
+  .coin-dot{ width:12px; height:12px; border-radius:50%; background:var(--gold); flex-shrink:0; }
+
+  .avatar-row{ display:flex; align-items:center; margin:10px 0 4px; }
+  .avatar{ width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; color:#fff; border:3px solid var(--bg-1); margin-left:-10px; }
+  .avatar:first-child{ margin-left:0; }
+  .avatar-count{ margin-left:12px; font-size:12.5px; color:var(--text-1); font-weight:600; }
+
+  .step-count{ font-size:30px; font-weight:900; color:var(--text-0); text-align:center; margin:6px 0 2px; }
+  .step-count-label{ text-align:center; color:var(--text-1); font-size:13px; margin-bottom:6px; }
+
+  .rank-row{ display:flex; align-items:center; gap:12px; padding:10px 0; }
+  .rank-row:not(:last-child){ border-bottom:1px solid var(--stroke); }
+  .rank-num{ width:20px; font-weight:800; color:var(--text-1); font-size:12.5px; flex-shrink:0; }
+  .rank-num.top{ color:var(--gold); }
+  .rank-avatar{ width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11.5px; font-weight:800; color:#fff; flex-shrink:0; }
+  .rank-name{ flex:1; font-size:13.5px; color:var(--text-0); font-weight:700; }
+  .rank-steps{ font-size:12.5px; color:var(--text-1); font-weight:600; }
+
+  .link-row{ display:flex; align-items:center; justify-content:space-between; }
+  .link-row .chev{ color:var(--text-2); font-size:16px; }
+
+  .reset-link{ text-align:center; font-size:12.5px; color:var(--text-2); margin-top:6px; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+
+  .toast{ position:absolute; left:50%; bottom:30px; transform:translateX(-50%) translateY(14px); background:rgba(22,23,32,.97); border:1px solid var(--stroke); color:#fff; padding:12px 18px; border-radius:16px; font-size:13px; font-weight:600; opacity:0; transition:.25s; pointer-events:none; z-index:90; white-space:nowrap; box-shadow:0 12px 30px -10px rgba(0,0,0,.6); }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .frame-caption{ font-size:12px; color:var(--text-1); text-align:center; }
+  .frame-caption b{ color:var(--text-0); }
+</style>
+</head>
+<body>
+
+  <div class="stage">
+
+    <div class="device-col">
+      <div class="iphone-shell">
+        <span class="side-btn btn-mute"></span>
+        <span class="side-btn btn-vol-up"></span>
+        <span class="side-btn btn-vol-down"></span>
+        <span class="side-btn btn-power"></span>
+
+        <div class="iphone-screen">
+          <div class="dynamic-island"></div>
+          <div class="statusbar">
+            <span>9:41</span>
+            <span class="right">
+              <span class="sig-bars"><span></span><span></span><span></span><span></span></span>
+              <span class="battery"><i></i></span>
+            </span>
+          </div>
+
+          <div class="app">
+
+            <!-- ============ SCREEN 1 : 진입 및 서비스 소개 ============ -->
+            <div class="screen active" id="screen-1">
+              <div class="hero-scene">
+                <div class="cloud" style="top:10%; left:8%; width:52px; height:18px;"></div>
+                <div class="cloud" style="top:5%; right:12%; width:66px; height:22px;"></div>
+                <div class="confetti-dot" style="top:18%; left:18%; background:var(--gold); transform:rotate(20deg);"></div>
+                <div class="confetti-dot" style="top:26%; right:16%; background:var(--mint); border-radius:50%;"></div>
+                <div class="confetti-dot" style="top:10%; right:34%; background:var(--coral); transform:rotate(-15deg);"></div>
+
+                <div class="screen-header">
+                  <div class="header-left">
+                    <button class="back-btn hidden">‹</button>
+                    <div class="header-title">함께 걸어요</div>
+                  </div>
+                  <div class="header-icons">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V9.5z"/></svg>
+                  </div>
+                </div>
+                <div class="step-dots"><span class="done"></span><span></span><span></span><span></span></div>
+
+                <div class="hero-content">
+                  <div class="hero-tags">
+                    <span class="tag-pill mint">🩺 건강</span>
+                    <span class="tag-pill coral">🤝 함께</span>
+                    <span class="tag-pill gold">🎁 리워드</span>
+                  </div>
+                  <div class="hero-main-row">
+                    <div class="hero-heading">혼자 걷지 말고,<br>지인들과 『함께 걸어요』!</div>
+                    <div class="mascot-row" id="mascotHero"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="sheet-white">
+                <div class="hero-sub-dark">가족, 친구와 그룹으로 걸으면 건강도 챙기고 리워드도 커져요. 매일 즐겁게 걷다 보면 투자도 어느새 가깝고 편하게 느껴질 거예요.</div>
+                <div class="card-light">
+                  <div class="card-title-dark">👟 '함께 걸어요'란?</div>
+                  <div class="card-desc-dark">2명 이상 모이면 그룹을 만들어 함께 걸을 수 있어요. 그룹원이 많을수록, 함께 걸을수록 리워드가 커져요.</div>
+                  <div class="bullet-list">
+                    <div class="bullet-item-dark"><span class="bullet-dot"></span>그룹 걷기 리워드 매일 적립</div>
+                    <div class="bullet-item-dark"><span class="bullet-dot"></span>지인 초대 시 1+1 리워드 지급</div>
+                    <div class="bullet-item-dark"><span class="bullet-dot"></span>쏠링크 연결 후 관심 주식 받기</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="screen-footer light">
+                <button class="primary-btn" onclick="goTo(2)">가입하기</button>
+              </div>
+            </div>
+
+            <!-- ============ SCREEN 2 : 그룹 구성 및 목표 설정 ============ -->
+            <div class="screen" id="screen-2">
+              <div class="screen-header">
+                <div class="header-left">
+                  <button class="back-btn" onclick="goTo(1)">‹</button>
+                  <div class="header-title">그룹 만들기</div>
+                </div>
+                <div class="header-icons">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V9.5z"/></svg>
+                </div>
+              </div>
+              <div class="step-dots"><span class="done"></span><span class="done"></span><span></span><span></span></div>
+
+              <div class="screen-body">
+                <div class="hero-title">2명만 모여도 시작,<br><b>함께할수록 늘어나는 혜택</b></div>
+                <div class="hero-sub">같이 걷는 사람이 있으면 더 오래, 더 즐겁게 걸을 수 있어요. 나만의 걷기 모임을 지금 만들어보세요.</div>
+
+                <div class="section-label">그룹 유형을 선택해주세요</div>
+                <div class="chip-row" id="groupTypeChips">
+                  <button class="chip active" data-type="친구">친구</button>
+                  <button class="chip" data-type="모임">모임</button>
+                  <button class="chip" data-type="동아리">동아리</button>
+                </div>
+
+                <div class="section-label">그룹명</div>
+                <div class="field">
+                  <input id="groupNameInput" type="text" placeholder="예: 도봉산 산악회" />
+                </div>
+
+                <div class="section-label">주간 목표 걸음 설정</div>
+                <div class="stepper">
+                  <button class="stepper-btn" onclick="adjustGoal(-10000)">–</button>
+                  <div class="stepper-mid">
+                    <div class="stepper-value" id="goalValue">50,000걸음</div>
+                    <div class="stepper-caption">그룹 전체가 함께 달성할 목표예요</div>
+                  </div>
+                  <button class="stepper-btn" onclick="adjustGoal(10000)">+</button>
+                </div>
+
+                <div class="card" style="margin-top:16px;">
+                  <div class="card-title">🤝 소속감이 꾸준함을 만들어요</div>
+                  <div class="card-desc">혼자보다 함께일 때 목표 달성률이 훨씬 높아져요. 그룹 채팅으로 서로 응원하며 걸어보세요.</div>
+                </div>
+              </div>
+
+              <div class="screen-footer">
+                <button class="primary-btn" onclick="goTo(3)">목표 설정하기</button>
+              </div>
+            </div>
+
+            <!-- ============ SCREEN 3 : 카카오톡 초대 및 정보 기입 ============ -->
+            <div class="screen" id="screen-3">
+              <div class="screen-header">
+                <div class="header-left">
+                  <button class="back-btn" onclick="goTo(2)">‹</button>
+                  <div class="header-title">지인 초대하기</div>
+                </div>
+                <div class="header-icons">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V9.5z"/></svg>
+                </div>
+              </div>
+              <div class="step-dots"><span class="done"></span><span class="done"></span><span class="done"></span><span></span></div>
+
+              <div class="screen-body">
+                <div class="hero-title">지인을 초대하면<br><b>너도 나도 1+1 리워드!</b></div>
+                <div class="hero-sub">초대가 완료되면 초대한 사람과 초대받은 사람 모두에게 리워드를 드려요.</div>
+
+                <button class="kakao-btn" onclick="inviteKakao()">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="#391B1B"><path d="M12 3C6.48 3 2 6.48 2 10.8c0 2.76 1.86 5.19 4.67 6.59-.2.75-.75 2.77-.86 3.2-.14.53.19.53.4.38.17-.12 2.65-1.8 3.73-2.53.66.1 1.34.15 2.06.15 5.52 0 10-3.48 10-7.79C22 6.48 17.52 3 12 3z"/></svg>
+                  카카오톡으로 초대하기
+                </button>
+
+                <div class="divider-text">또는 직접 입력하기</div>
+                <div class="field-row">
+                  <div class="field"><label>이름</label><input id="inviteName" type="text" placeholder="홍길동" /></div>
+                  <div class="field"><label>연락처</label><input id="invitePhone" type="text" placeholder="010-0000-0000" /></div>
+                </div>
+                <button class="add-btn" onclick="addManualInvite()">+ 초대 목록에 추가</button>
+
+                <div class="invite-list" id="inviteList"></div>
+
+                <div class="card" style="margin-top:6px;">
+                  <div class="card-title">🎁 초대 리워드</div>
+                  <div class="reward-row"><span>초대한 사람</span><b>+2,000P</b></div>
+                  <div class="reward-row"><span>초대받은 사람</span><b>+2,000P</b></div>
+                </div>
+              </div>
+
+              <div class="screen-footer">
+                <button class="primary-btn" onclick="goTo(45)">다음</button>
+              </div>
+            </div>
+
+            <!-- ============ SCREEN 4+5 : 쏠링크 계좌 소개 + 연결 여부 확인 ============ -->
+            <div class="screen" id="screen-45">
+              <div class="screen-header">
+                <div class="header-left">
+                  <button class="back-btn" onclick="goTo(3)">‹</button>
+                  <div class="header-title">쏠링크 계좌 연결</div>
+                </div>
+                <div class="header-icons">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V9.5z"/></svg>
+                </div>
+              </div>
+              <div class="step-dots"><span class="done"></span><span class="done"></span><span class="done"></span><span class="done"></span></div>
+
+              <div class="screen-body">
+                <div class="hero-title">함께 걸어요의 특별한 리워드를 받으려면<br><b>쏠링크 연결이 필요해요!</b></div>
+                <div class="hero-sub">쏠링크는 신한은행의 간편투자 서비스예요. 걷기로 모은 리워드를 쏠링크 포인트로 바로 전환할 수 있어요.</div>
+
+                <div class="card">
+                  <div class="card-title">🔗 쏠링크 계좌를 보유하고 계신가요?</div>
+                  <div class="card-desc">아래 버튼을 누르면 보유 여부를 바로 확인해드려요.</div>
+                </div>
+                <button class="ghost-btn" onclick="checkAccount()">계좌 확인하기</button>
+
+                <div class="section-label" style="margin-top:26px;">계좌 연결 여부 확인</div>
+
+                <div class="loading-row" id="loadingRow">
+                  계좌 자동 조회 중
+                  <span class="dot-flash"><span></span><span></span><span></span></span>
+                </div>
+
+                <div class="demo-note">데모용 · 발표 시 결과 상태 전환</div>
+                <div class="demo-toggle">
+                  <button class="active" data-state="none" onclick="setDemoState('none')">미보유로 보기</button>
+                  <button data-state="has" onclick="setDemoState('has')">보유로 보기</button>
+                </div>
+
+                <div class="card result-card" id="result-none">
+                  <div class="card-title">🙋 쏠링크 계좌가 아직 없으시네요!</div>
+                  <div class="card-desc">지금 바로 간편하게 개설하고 걷기 리워드를 받아보세요. 개설은 1분이면 충분해요.</div>
+                  <button class="primary-btn" style="margin-top:14px;" onclick="openAccount()">쏠링크 계좌 개설하기</button>
+                </div>
+
+                <div class="card result-card" id="result-has">
+                  <div class="card-title">✅ 기존 쏠링크 계좌가 있어요</div>
+                  <div class="card-desc">신한 110-***-123456 계좌를 '함께 걸어요'에 연결할까요?</div>
+                  <button class="primary-btn" style="margin-top:14px;" onclick="connectAccount()">계좌 연결하기</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- ============ FINAL : 그룹 걸음 현황 ============ -->
+            <div class="screen" id="screen-final">
+              <div class="screen-header">
+                <div class="header-left">
+                  <button class="back-btn" onclick="goTo(45)">‹</button>
+                  <div class="header-title">함께 걸어요</div>
+                </div>
+                <div class="header-icons">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.5 12.5l1.8 1.8L15 10.5"/></svg>
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V9.5z"/></svg>
+                </div>
+              </div>
+              <div class="done-badge">🎉 쏠링크 연결 완료</div>
+
+              <div class="screen-body">
+                <div class="mini-hero"><div class="mascot-row mini" id="mascotFinal"></div></div>
+
+                <div class="step-count" id="finalStepCount">오늘 우리 그룹 12,406걸음</div>
+                <div class="step-count-label" id="finalGroupLabel">친구 · 그룹원 4명</div>
+
+                <div class="avatar-row" id="finalAvatarRow"></div>
+
+                <div class="progress-wrap">
+                  <div class="progress-track"><div class="progress-fill" id="finalProgressFill" style="width:24%;"></div></div>
+                  <div class="progress-labels">
+                    <span class="milestone-pill"><span class="coin-dot"></span><span id="milestoneGoal">25,000</span></span>
+                    <span class="milestone-pill"><span class="coin-dot"></span><span id="milestoneStretch">50,000</span></span>
+                  </div>
+                </div>
+
+                <button class="primary-btn" style="margin-top:22px;" onclick="claimStock()">관심 주식 받기</button>
+
+                <div class="card" style="margin-top:18px;">
+                  <div class="card-title">📈 관심 종목 선정하기</div>
+                  <div class="card-desc" id="stockHint">관심 주식을 선택하여 주식을 받아요!</div>
+                  <div class="stock-grid" id="stockChips" style="margin-top:12px;">
+                    <button class="stock-tile" data-stock="엔비디아">
+                      <span class="stock-badge" style="background:#76b900; font-size:8px;">NVDA</span>
+                      <span class="stock-info"><span class="stock-name">엔비디아</span><span class="stock-ticker">NVDA</span></span>
+                    </button>
+                    <button class="stock-tile" data-stock="테슬라">
+                      <span class="stock-badge" style="background:#e31937; font-size:8px;">TSLA</span>
+                      <span class="stock-info"><span class="stock-name">테슬라</span><span class="stock-ticker">TSLA</span></span>
+                    </button>
+                    <button class="stock-tile" data-stock="애플">
+                      <span class="stock-badge" style="background:#1d1d1f; font-size:8px;">AAPL</span>
+                      <span class="stock-info"><span class="stock-name">애플</span><span class="stock-ticker">AAPL</span></span>
+                    </button>
+                    <button class="stock-tile" data-stock="마이크로소프트">
+                      <span class="stock-badge" style="background:#0078d4; font-size:8px;">MSFT</span>
+                      <span class="stock-info"><span class="stock-name">마이크로소프트</span><span class="stock-ticker">MSFT</span></span>
+                    </button>
+                    <button class="stock-tile" data-stock="삼성전자">
+                      <span class="stock-badge" style="background:#1428a0; font-size:6.8px;">005930</span>
+                      <span class="stock-info"><span class="stock-name">삼성전자</span><span class="stock-ticker">005930</span></span>
+                    </button>
+                    <button class="stock-tile" data-stock="SK하이닉스">
+                      <span class="stock-badge" style="background:#ff6600; font-size:6.8px;">000660</span>
+                      <span class="stock-info"><span class="stock-name">SK하이닉스</span><span class="stock-ticker">000660</span></span>
+                    </button>
+                    <button class="stock-tile" data-stock="카카오">
+                      <span class="stock-badge" style="background:#fee500; color:#391B1B; font-size:6.8px;">035720</span>
+                      <span class="stock-info"><span class="stock-name">카카오</span><span class="stock-ticker">035720</span></span>
+                    </button>
+                    <button class="stock-tile" data-stock="네이버">
+                      <span class="stock-badge" style="background:#03c75a; font-size:6.8px;">035420</span>
+                      <span class="stock-info"><span class="stock-name">네이버</span><span class="stock-ticker">035420</span></span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="card">
+                  <div class="link-row">
+                    <div>
+                      <div class="card-title" style="margin-bottom:2px;">🔔 이번주 미션 성공하고 포인트 받기</div>
+                      <div class="card-desc">깜빡하지 않게 미션 알림받기</div>
+                    </div>
+                    <button class="chip active" style="flex-shrink:0;" onclick="showToast('미션 알림을 설정했어요')">설정</button>
+                  </div>
+                </div>
+
+                <div class="card">
+                  <div class="card-title">🏆 멤버별 걸음 순위</div>
+                  <div id="rankList" style="margin-top:6px;"></div>
+                </div>
+
+                <div class="card" style="cursor:pointer;" onclick="showToast('걸음 리포트로 이동해요')">
+                  <div class="link-row">
+                    <div>
+                      <div class="card-title" style="margin-bottom:2px;">📊 지금까지 우리 그룹 얼마나 걸었을까?</div>
+                      <div class="card-desc">걸음 리포트 보기</div>
+                    </div>
+                    <span class="chev">›</span>
+                  </div>
+                </div>
+
+                <div class="reset-link" onclick="resetDemo()">처음부터 다시 보기</div>
+              </div>
+            </div>
+
+          </div>
+          <div class="toast" id="toast"></div>
+        </div>
+      </div>
+
+      <div class="frame-caption" id="frameCaption">STEP <b>1 / 4</b> · 서비스 소개</div>
+    </div>
+
+    <div class="control-panel">
+      <div class="eyebrow">SOL LINK · Prototype</div>
+      <h1>함께 걸어요</h1>
+      <p>고령층 고객의 투자 진입 장벽을 낮추는 그룹 걷기 리워드 기능. 건강·함께·리워드로 쏠링크까지 자연스럽게 연결돼요.</p>
+      <div class="panel-divider"></div>
+      <div class="panel-label">화면 바로가기</div>
+      <div class="jump-row" id="jumpRow">
+        <button class="jump-btn" data-n="1">① 서비스 소개</button>
+        <button class="jump-btn" data-n="2">② 그룹 · 목표설정</button>
+        <button class="jump-btn" data-n="3">③ 지인 초대</button>
+        <button class="jump-btn" data-n="45">④⑤ 쏠링크 연결</button>
+        <button class="jump-btn" data-n="final">완료 · 그룹현황</button>
+      </div>
+      <div class="panel-divider"></div>
+      <div class="panel-hint">아이폰 화면만 캡처하거나 화면 공유하면 발표용으로 바로 쓸 수 있어요.</div>
+    </div>
+
+  </div>
+
+<script>
+  const state = {
+    groupType: '친구',
+    groupName: '',
+    weeklyGoal: 50000,
+    invites: [],
+    demoAccountState: 'none',
+    selectedStock: null
+  };
+  const avatarColors = ['#3f5fff','#46e0b0','#ffcf5c','#ff7a7a','#7c9bff','#c084fc'];
+  const baseMembers = [
+    { name:'나', steps:3212 },
+    { name:'김서연', steps:4108 },
+    { name:'박준호', steps:2890 },
+    { name:'이하은', steps:2196 }
+  ];
+
+  const captions = {
+    '1': ['1 / 4', '서비스 소개'],
+    '2': ['2 / 4', '그룹 구성 · 목표 설정'],
+    '3': ['3 / 4', '지인 초대'],
+    '45': ['4 / 4', '쏠링크 계좌 연결'],
+    'final': ['완료', '그룹 걸음 현황']
+  };
+
+  /* ---- original mascot pair (simplified, hand-drawn — not the actual brand character) ---- */
+  const mascotDuoSVG = `
+    <svg class="mascot mascot-a" viewBox="0 0 140 190" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="furA" cx="35%" cy="28%" r="75%">
+          <stop offset="0%" stop-color="#ffffff"/>
+          <stop offset="100%" stop-color="#e6ecf6"/>
+        </radialGradient>
+      </defs>
+      <ellipse cx="70" cy="182" rx="30" ry="8" fill="rgba(0,0,0,.18)"/>
+      <rect x="50" y="152" width="18" height="26" rx="9" fill="url(#furA)" stroke="#d5e2f2" stroke-width="2"/>
+      <rect x="72" y="152" width="18" height="26" rx="9" fill="url(#furA)" stroke="#d5e2f2" stroke-width="2"/>
+      <rect x="38" y="98" width="64" height="58" rx="28" fill="url(#furA)" stroke="#d5e2f2" stroke-width="2"/>
+      <rect x="20" y="106" width="18" height="36" rx="9" fill="url(#furA)" stroke="#d5e2f2" stroke-width="2" transform="rotate(-16 29 106)"/>
+      <rect x="102" y="106" width="18" height="36" rx="9" fill="url(#furA)" stroke="#d5e2f2" stroke-width="2" transform="rotate(16 111 106)"/>
+      <path d="M44 94 q26 14 52 0 l-5 14 q-21 9 -42 0 z" fill="#3f5fff"/>
+      <path d="M64 106 l-4 16 q4 4 8 0 l-4 -16 z" fill="#2748e0"/>
+      <circle cx="70" cy="58" r="36" fill="url(#furA)" stroke="#d5e2f2" stroke-width="2"/>
+      <circle cx="40" cy="30" r="15" fill="url(#furA)" stroke="#d5e2f2" stroke-width="2"/>
+      <circle cx="100" cy="30" r="15" fill="url(#furA)" stroke="#d5e2f2" stroke-width="2"/>
+      <circle cx="40" cy="30" r="6.5" fill="#ffd9df"/>
+      <circle cx="100" cy="30" r="6.5" fill="#ffd9df"/>
+      <rect x="46" y="52" width="21" height="17" rx="7" fill="rgba(255,193,66,.55)" stroke="#2b2b33" stroke-width="2.6"/>
+      <rect x="73" y="52" width="21" height="17" rx="7" fill="rgba(255,193,66,.55)" stroke="#2b2b33" stroke-width="2.6"/>
+      <path d="M67 59 h6" stroke="#2b2b33" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M46 58 q-6 -1 -9 3" stroke="#2b2b33" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <path d="M94 58 q6 -1 9 3" stroke="#2b2b33" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <ellipse cx="70" cy="80" rx="7" ry="5" fill="#20232c"/>
+      <path d="M70 85 q-6 5 -10 2 M70 85 q6 5 10 2" stroke="#20232c" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <circle cx="46" cy="74" r="6.5" fill="#ff9fb0" opacity=".5"/>
+      <circle cx="94" cy="74" r="6.5" fill="#ff9fb0" opacity=".5"/>
+      <path d="M22 140 q-3 8 -2 16" stroke="#5b6472" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <rect x="10" y="156" width="24" height="28" rx="7" fill="#6fa0ff" stroke="#28407a" stroke-width="2"/>
+      <circle cx="22" cy="163" r="2.2" fill="#28407a"/>
+      <path d="M22 176 c-3 -3 -8 -1 -8 3 c0 3 4 6 8 9 c4 -3 8 -6 8 -9 c0 -4 -5 -6 -8 -3 z" fill="#ffffff"/>
+    </svg>
+    <svg class="mascot mascot-b" viewBox="0 0 110 150" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="furB" cx="35%" cy="28%" r="75%">
+          <stop offset="0%" stop-color="#ffffff"/>
+          <stop offset="100%" stop-color="#e6ecf6"/>
+        </radialGradient>
+      </defs>
+      <ellipse cx="55" cy="142" rx="25" ry="7" fill="rgba(0,0,0,.18)"/>
+      <rect x="38" y="118" width="15" height="20" rx="7.5" fill="url(#furB)" stroke="#d5e2f2" stroke-width="2"/>
+      <rect x="57" y="118" width="15" height="20" rx="7.5" fill="url(#furB)" stroke="#d5e2f2" stroke-width="2"/>
+      <rect x="28" y="78" width="54" height="46" rx="23" fill="url(#furB)" stroke="#d5e2f2" stroke-width="2"/>
+      <rect x="76" y="76" width="14" height="28" rx="7" fill="url(#furB)" stroke="#d5e2f2" stroke-width="2" transform="rotate(-32 83 76)"/>
+      <rect x="16" y="84" width="14" height="26" rx="7" fill="url(#furB)" stroke="#d5e2f2" stroke-width="2" transform="rotate(14 23 84)"/>
+      <path d="M34 76 q21 11 42 0 l-4 11 q-17 7 -34 0 z" fill="#c9b8ff"/>
+      <circle cx="55" cy="46" r="29" fill="url(#furB)" stroke="#d5e2f2" stroke-width="2"/>
+      <circle cx="30" cy="22" r="12" fill="url(#furB)" stroke="#d5e2f2" stroke-width="2"/>
+      <circle cx="80" cy="22" r="12" fill="url(#furB)" stroke="#d5e2f2" stroke-width="2"/>
+      <circle cx="30" cy="22" r="5" fill="#ffd9df"/>
+      <circle cx="80" cy="22" r="5" fill="#ffd9df"/>
+      <circle cx="44" cy="46" r="3.6" fill="#20232c"/>
+      <circle cx="66" cy="46" r="3.6" fill="#20232c"/>
+      <ellipse cx="55" cy="55" rx="5.6" ry="4.2" fill="#20232c"/>
+      <path d="M55 60 q-5 4 -8 1.6 M55 60 q5 4 8 1.6" stroke="#20232c" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="35" cy="53" r="5.2" fill="#ff9fb0" opacity=".5"/>
+      <circle cx="75" cy="53" r="5.2" fill="#ff9fb0" opacity=".5"/>
+      <rect x="86" y="46" width="14" height="24" rx="4" fill="#2b2d38" stroke="#14151c" stroke-width="1.6" transform="rotate(-14 93 58)"/>
+      <rect x="88.5" y="49" width="9" height="15" rx="1.6" fill="#8fb4ff" transform="rotate(-14 93 58)"/>
+      <path d="M20 108 q-2 6 -1 12" stroke="#5b6472" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+      <rect x="10" y="120" width="19" height="22" rx="6" fill="#c9b8ff" stroke="#5a4a99" stroke-width="1.8"/>
+      <circle cx="19.5" cy="126" r="1.8" fill="#5a4a99"/>
+    </svg>
+  `;
+  document.getElementById('mascotHero').innerHTML = mascotDuoSVG;
+  document.getElementById('mascotFinal').innerHTML = mascotDuoSVG;
+
+  function goTo(n){
+    n = String(n);
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    const target = document.getElementById('screen-' + n);
+    if(target) target.classList.add('active');
+    const body = target ? (target.querySelector('.screen-body') || target.querySelector('.sheet-white')) : null;
+    if(body) body.scrollTop = 0;
+
+    document.querySelectorAll('.jump-btn').forEach(b => b.classList.toggle('on', b.dataset.n === n));
+    const cap = captions[n];
+    if(cap){
+      document.getElementById('frameCaption').innerHTML = 'STEP <b>' + cap[0] + '</b> · ' + cap[1];
+    }
+    if(n === 'final') renderFinal();
+  }
+
+  document.getElementById('jumpRow').addEventListener('click', function(e){
+    const btn = e.target.closest('.jump-btn');
+    if(btn) goTo(btn.dataset.n);
+  });
+
+  let toastTimer;
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  /* ---- Screen 2 ---- */
+  document.getElementById('groupTypeChips').addEventListener('click', function(e){
+    const chip = e.target.closest('.chip');
+    if(!chip) return;
+    this.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    state.groupType = chip.dataset.type;
+  });
+  document.getElementById('groupNameInput').addEventListener('input', function(){
+    state.groupName = this.value.trim();
+  });
+  function adjustGoal(delta){
+    state.weeklyGoal = Math.min(150000, Math.max(20000, state.weeklyGoal + delta));
+    document.getElementById('goalValue').textContent = state.weeklyGoal.toLocaleString() + '걸음';
+  }
+
+  /* ---- Screen 3 ---- */
+  function renderInviteList(){
+    const wrap = document.getElementById('inviteList');
+    wrap.innerHTML = state.invites.map(name =>
+      '<span class="invite-chip"><span class="ok">✓</span>' + name + '</span>'
+    ).join('');
+  }
+  function inviteKakao(){
+    const names = ['김민지','정우성','오세훈','박지민'];
+    const name = names[state.invites.length % names.length];
+    state.invites.push(name);
+    renderInviteList();
+    showToast('카카오톡 초대장을 보냈어요 🎉');
+  }
+  function addManualInvite(){
+    const nameEl = document.getElementById('inviteName');
+    const phoneEl = document.getElementById('invitePhone');
+    const name = nameEl.value.trim();
+    if(!name){ showToast('이름을 입력해주세요'); return; }
+    state.invites.push(name);
+    renderInviteList();
+    showToast(name + '님을 초대했어요');
+    nameEl.value = ''; phoneEl.value = '';
+  }
+
+  /* ---- Screen 4+5 ---- */
+  function setDemoState(s){
+    state.demoAccountState = s;
+    document.querySelectorAll('.demo-toggle button').forEach(b => b.classList.toggle('active', b.dataset.state === s));
+    if(document.getElementById('result-none').style.display === 'block' ||
+       document.getElementById('result-has').style.display === 'block'){
+      revealResult();
+    }
+  }
+  function revealResult(){
+    document.getElementById('result-none').style.display = state.demoAccountState === 'none' ? 'block' : 'none';
+    document.getElementById('result-has').style.display = state.demoAccountState === 'has' ? 'block' : 'none';
+  }
+  function checkAccount(){
+    document.getElementById('result-none').style.display = 'none';
+    document.getElementById('result-has').style.display = 'none';
+    document.getElementById('loadingRow').style.display = 'flex';
+    setTimeout(() => {
+      document.getElementById('loadingRow').style.display = 'none';
+      revealResult();
+    }, 900);
+  }
+  function openAccount(){
+    showToast('쏠링크 계좌가 개설·연결됐어요 ✅');
+    setTimeout(() => goTo('final'), 850);
+  }
+  function connectAccount(){
+    showToast('쏠링크 계좌가 연결됐어요 ✅');
+    setTimeout(() => goTo('final'), 850);
+  }
+
+  /* ---- Final screen ---- */
+  function renderFinal(){
+    let names = ['나'];
+    if(state.invites.length > 0){
+      names = names.concat(state.invites.slice(0, 5));
+    } else {
+      names = names.concat(baseMembers.slice(1).map(m => m.name));
+    }
+
+    const goal = state.weeklyGoal;
+    const goalMet = Math.random() < 0.5;
+    const total = goalMet
+      ? Math.round(goal * (1.02 + Math.random() * 0.28))
+      : Math.round(goal * (0.35 + Math.random() * 0.45));
+
+    const weights = names.map(() => 0.6 + Math.random() * 0.8);
+    const weightSum = weights.reduce((a, b) => a + b, 0);
+    const steps = weights.map(w => Math.round((w / weightSum) * total / 10) * 10);
+    const drift = total - steps.reduce((a, b) => a + b, 0);
+    steps[steps.length - 1] = Math.max(0, steps[steps.length - 1] + drift);
+
+    state.finalMembers = names.map((name, i) => ({ name, steps: steps[i] }));
+    state.finalTotal = state.finalMembers.reduce((sum, m) => sum + m.steps, 0);
+    state.goalMet = goalMet;
+
+    renderFinalDOM();
+    updateStockHint();
+  }
+
+  function renderFinalDOM(){
+    const members = state.finalMembers;
+    const total = state.finalTotal;
+    const goal = state.weeklyGoal;
+    const halfway = Math.round(goal / 2);
+    const pct = Math.min(100, Math.round((total / goal) * 100));
+
+    document.getElementById('finalStepCount').textContent = '오늘 우리 그룹 ' + total.toLocaleString() + '걸음';
+    document.getElementById('finalGroupLabel').textContent =
+      (state.groupName || '우리 모임') + ' · ' + state.groupType + ' · 그룹원 ' + members.length + '명';
+    document.getElementById('finalProgressFill').style.width = pct + '%';
+    document.getElementById('milestoneGoal').textContent = halfway.toLocaleString();
+    document.getElementById('milestoneStretch').textContent = goal.toLocaleString();
+
+    const avatarRow = document.getElementById('finalAvatarRow');
+    avatarRow.innerHTML = members.map((m, i) =>
+      '<span class="avatar" style="background:' + avatarColors[i % avatarColors.length] + ';">' + m.name[0] + '</span>'
+    ).join('') + '<span class="avatar-count">' + members.length + '명이 함께 걷고 있어요</span>';
+
+    const sorted = [...members].sort((a,b) => b.steps - a.steps);
+    document.getElementById('rankList').innerHTML = sorted.map((m, i) =>
+      '<div class="rank-row">' +
+        '<span class="rank-num' + (i === 0 ? ' top' : '') + '">' + (i+1) + '</span>' +
+        '<span class="rank-avatar" style="background:' + avatarColors[i % avatarColors.length] + ';">' + m.name[0] + '</span>' +
+        '<span class="rank-name">' + m.name + '</span>' +
+        '<span class="rank-steps">' + m.steps.toLocaleString() + '걸음</span>' +
+      '</div>'
+    ).join('');
+  }
+
+  function updateStockHint(){
+    const hint = document.getElementById('stockHint');
+    document.querySelectorAll('#stockChips .stock-tile').forEach(c =>
+      c.classList.toggle('active', c.dataset.stock === state.selectedStock)
+    );
+    hint.textContent = state.selectedStock
+      ? '선택한 관심 종목: ' + state.selectedStock
+      : '관심 주식을 선택하여 주식을 받아요!';
+  }
+
+  document.getElementById('stockChips').addEventListener('click', function(e){
+    const tile = e.target.closest('.stock-tile');
+    if(!tile) return;
+    state.selectedStock = tile.dataset.stock;
+    updateStockHint();
+  });
+
+  function claimStock(){
+    if(!state.goalMet){
+      showToast('걸음 수를 채워야 주식이 지급됩니다');
+      return;
+    }
+    if(!state.selectedStock){
+      showToast('먼저 관심 종목을 선택해주세요');
+      return;
+    }
+    showToast(state.selectedStock + ' 소수점 주식이 SOL Link 계좌에 지급됐어요 🎉');
+
+    state.finalMembers = state.finalMembers.map(m => ({ name: m.name, steps: 0 }));
+    state.finalTotal = 0;
+    state.goalMet = false;
+    renderFinalDOM();
+  }
+
+  function resetDemo(){
+    state.groupType = '친구';
+    state.groupName = '';
+    state.weeklyGoal = 50000;
+    state.invites = [];
+    state.demoAccountState = 'none';
+    state.selectedStock = null;
+    document.getElementById('groupNameInput').value = '';
+    document.getElementById('goalValue').textContent = '50,000걸음';
+    document.getElementById('groupTypeChips').querySelectorAll('.chip').forEach((c,i) => c.classList.toggle('active', i===0));
+    document.getElementById('inviteList').innerHTML = '';
+    document.getElementById('result-none').style.display = 'none';
+    document.getElementById('result-has').style.display = 'none';
+    document.getElementById('loadingRow').style.display = 'none';
+    setDemoState('none');
+    goTo(1);
+  }
+</script>
+</body>
+</html>
